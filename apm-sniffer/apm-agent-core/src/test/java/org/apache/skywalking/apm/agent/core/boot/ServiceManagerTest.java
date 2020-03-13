@@ -19,9 +19,6 @@
 
 package org.apache.skywalking.apm.agent.core.boot;
 
-import java.lang.reflect.Field;
-import java.util.HashMap;
-import java.util.List;
 import org.apache.skywalking.apm.agent.core.context.ContextManager;
 import org.apache.skywalking.apm.agent.core.context.IgnoredTracerContext;
 import org.apache.skywalking.apm.agent.core.context.TracingContext;
@@ -35,6 +32,10 @@ import org.apache.skywalking.apm.agent.core.test.tools.AgentServiceRule;
 import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
+
+import java.lang.reflect.Field;
+import java.util.List;
+import java.util.Map;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -53,7 +54,16 @@ public class ServiceManagerTest {
 
     @Test
     public void testServiceDependencies() throws Exception {
-        HashMap<Class, BootService> registryService = getFieldValue(ServiceManager.INSTANCE, "bootedServices");
+
+        /**
+         * 反射获取 bootedServices
+         */
+        Map<Class, BootService> registryService = getFieldValue(ServiceManager.INSTANCE, "bootedServices");
+
+
+        for (Class cls : registryService.keySet()) {
+            System.out.println(cls);
+        }
 
         assertThat(registryService.size(), is(7));
 
@@ -105,13 +115,13 @@ public class ServiceManagerTest {
     private <T> T getFieldValue(Object instance, String fieldName) throws Exception {
         Field field = instance.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
-        return (T)field.get(instance);
+        return (T) field.get(instance);
     }
 
     private <T> T getFieldValue(Class clazz, String fieldName) throws Exception {
         Field field = clazz.getDeclaredField(fieldName);
         field.setAccessible(true);
-        return (T)field.get(clazz);
+        return (T) field.get(clazz);
     }
 
 }

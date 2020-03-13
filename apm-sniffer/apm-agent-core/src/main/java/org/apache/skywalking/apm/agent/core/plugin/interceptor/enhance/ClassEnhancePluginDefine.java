@@ -196,6 +196,7 @@ public abstract class ClassEnhancePluginDefine extends AbstractClassEnhancePlugi
      */
     private DynamicType.Builder<?> enhanceClass(TypeDescription typeDescription,
         DynamicType.Builder<?> newClassBuilder, ClassLoader classLoader) throws PluginException {
+
         StaticMethodsInterceptPoint[] staticMethodsInterceptPoints = getStaticMethodsInterceptPoints();
         String enhanceOriginClassName = typeDescription.getTypeName();
         if (staticMethodsInterceptPoints == null || staticMethodsInterceptPoints.length == 0) {

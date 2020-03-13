@@ -47,6 +47,7 @@ public abstract class AbstractClassEnhancePluginDefine {
      */
     public DynamicType.Builder<?> define(TypeDescription typeDescription,
                                          DynamicType.Builder<?> builder, ClassLoader classLoader, EnhanceContext context) throws PluginException {
+
         String interceptorDefineClassName = this.getClass().getName();
         String transformClassName = typeDescription.getTypeName();
         if (StringUtil.isEmpty(transformClassName)) {

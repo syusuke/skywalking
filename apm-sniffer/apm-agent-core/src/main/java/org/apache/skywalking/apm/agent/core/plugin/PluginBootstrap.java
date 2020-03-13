@@ -18,13 +18,14 @@
 
 package org.apache.skywalking.apm.agent.core.plugin;
 
+import org.apache.skywalking.apm.agent.core.boot.AgentPackageNotFoundException;
+import org.apache.skywalking.apm.agent.core.logging.api.ILog;
+import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
+import org.apache.skywalking.apm.agent.core.plugin.loader.AgentClassLoader;
+
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.skywalking.apm.agent.core.boot.AgentPackageNotFoundException;
-import org.apache.skywalking.apm.agent.core.plugin.loader.AgentClassLoader;
-import org.apache.skywalking.apm.agent.core.logging.api.ILog;
-import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 
 /**
  * Plugins finder.
@@ -42,6 +43,8 @@ public class PluginBootstrap {
      * @return plugin definition list.
      */
     public List<AbstractClassEnhancePluginDefine> loadPlugins() throws AgentPackageNotFoundException {
+
+        // ClassLoader
         AgentClassLoader.initDefaultLoader();
 
         PluginResourcesResolver resolver = new PluginResourcesResolver();
@@ -52,6 +55,7 @@ public class PluginBootstrap {
             return new ArrayList<AbstractClassEnhancePluginDefine>();
         }
 
+        // 加载所的插件
         for (URL pluginUrl : resources) {
             try {
                 PluginCfg.INSTANCE.load(pluginUrl.openStream());
@@ -60,17 +64,20 @@ public class PluginBootstrap {
             }
         }
 
+        // 插件列表
         List<PluginDefine> pluginClassList = PluginCfg.INSTANCE.getPluginClassList();
 
         List<AbstractClassEnhancePluginDefine> plugins = new ArrayList<AbstractClassEnhancePluginDefine>();
         for (PluginDefine pluginDefine : pluginClassList) {
             try {
                 logger.debug("loading plugin class {}.", pluginDefine.getDefineClass());
-                AbstractClassEnhancePluginDefine plugin =
-                    (AbstractClassEnhancePluginDefine)Class.forName(pluginDefine.getDefineClass(),
-                        true,
-                        AgentClassLoader.getDefault())
-                        .newInstance();
+
+                // Class.forName("classname", true, clasLoader)
+
+                final Class<?> pluginClass = Class.forName(pluginDefine.getDefineClass(), true, AgentClassLoader.getDefault());
+                // 创建插件实例
+                AbstractClassEnhancePluginDefine plugin = (AbstractClassEnhancePluginDefine) pluginClass.getDeclaredConstructor().newInstance();
+                // AbstractClassEnhancePluginDefine plugin = (AbstractClassEnhancePluginDefine) pluginClass.newInstance();
                 plugins.add(plugin);
             } catch (Throwable t) {
                 logger.error(t, "load plugin [{}] failure.", pluginDefine.getDefineClass());

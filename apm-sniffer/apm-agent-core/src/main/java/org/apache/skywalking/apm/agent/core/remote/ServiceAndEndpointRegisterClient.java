@@ -19,10 +19,6 @@
 package org.apache.skywalking.apm.agent.core.remote;
 
 import io.grpc.Channel;
-import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import org.apache.skywalking.apm.agent.core.boot.BootService;
 import org.apache.skywalking.apm.agent.core.boot.DefaultImplementor;
 import org.apache.skywalking.apm.agent.core.boot.DefaultNamedThreadFactory;
@@ -36,17 +32,14 @@ import org.apache.skywalking.apm.agent.core.logging.api.ILog;
 import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 import org.apache.skywalking.apm.agent.core.os.OSUtil;
 import org.apache.skywalking.apm.network.common.KeyIntValuePair;
-import org.apache.skywalking.apm.network.register.v2.RegisterGrpc;
-import org.apache.skywalking.apm.network.register.v2.Service;
-import org.apache.skywalking.apm.network.register.v2.ServiceInstance;
-import org.apache.skywalking.apm.network.register.v2.ServiceInstancePingGrpc;
-import org.apache.skywalking.apm.network.register.v2.ServiceInstancePingPkg;
-import org.apache.skywalking.apm.network.register.v2.ServiceInstanceRegisterMapping;
-import org.apache.skywalking.apm.network.register.v2.ServiceInstances;
-import org.apache.skywalking.apm.network.register.v2.ServiceRegisterMapping;
-import org.apache.skywalking.apm.network.register.v2.Services;
+import org.apache.skywalking.apm.network.register.v2.*;
 import org.apache.skywalking.apm.util.RunnableWithExceptionProtection;
 import org.apache.skywalking.apm.util.StringUtil;
+
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author wusheng
@@ -76,22 +69,24 @@ public class ServiceAndEndpointRegisterClient implements BootService, Runnable, 
 
     @Override
     public void prepare() throws Throwable {
+
+        // add to ChannelManager
         ServiceManager.INSTANCE.findService(GRPCChannelManager.class).addChannelListener(this);
 
+        // 没有配置就随机生成一个
         INSTANCE_UUID = StringUtil.isEmpty(Config.Agent.INSTANCE_UUID) ? UUID.randomUUID().toString()
-            .replaceAll("-", "") : Config.Agent.INSTANCE_UUID;
+                .replaceAll("-", "") : Config.Agent.INSTANCE_UUID;
     }
 
     @Override
     public void boot() throws Throwable {
-        applicationRegisterFuture = Executors
-            .newSingleThreadScheduledExecutor(new DefaultNamedThreadFactory("ServiceAndEndpointRegisterClient"))
-            .scheduleAtFixedRate(new RunnableWithExceptionProtection(this, new RunnableWithExceptionProtection.CallbackWhenException() {
-                @Override
-                public void handle(Throwable t) {
-                    logger.error("unexpected exception.", t);
-                }
-            }), 0, Config.Collector.APP_AND_SERVICE_REGISTER_CHECK_INTERVAL, TimeUnit.SECONDS);
+        applicationRegisterFuture = Executors.newSingleThreadScheduledExecutor(new DefaultNamedThreadFactory("ServiceAndEndpointRegisterClient"))
+                .scheduleAtFixedRate(new RunnableWithExceptionProtection(this, new RunnableWithExceptionProtection.CallbackWhenException() {
+                    @Override
+                    public void handle(Throwable t) {
+                        logger.error("unexpected exception.", t);
+                    }
+                }), 0, Config.Collector.APP_AND_SERVICE_REGISTER_CHECK_INTERVAL, TimeUnit.SECONDS);
     }
 
     @Override
@@ -113,7 +108,7 @@ public class ServiceAndEndpointRegisterClient implements BootService, Runnable, 
                 if (RemoteDownstreamConfig.Agent.SERVICE_ID == DictionaryUtil.nullValue()) {
                     if (registerBlockingStub != null) {
                         ServiceRegisterMapping serviceRegisterMapping = registerBlockingStub.doServiceRegister(
-                            Services.newBuilder().addServices(Service.newBuilder().setServiceName(Config.Agent.SERVICE_NAME)).build());
+                                Services.newBuilder().addServices(Service.newBuilder().setServiceName(Config.Agent.SERVICE_NAME)).build());
                         if (serviceRegisterMapping != null) {
                             for (KeyIntValuePair registered : serviceRegisterMapping.getServicesList()) {
                                 if (Config.Agent.SERVICE_NAME.equals(registered.getKey())) {
@@ -128,13 +123,13 @@ public class ServiceAndEndpointRegisterClient implements BootService, Runnable, 
                         if (RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID == DictionaryUtil.nullValue()) {
 
                             ServiceInstanceRegisterMapping instanceMapping = registerBlockingStub.doServiceInstanceRegister(ServiceInstances.newBuilder()
-                                .addInstances(
-                                    ServiceInstance.newBuilder()
-                                        .setServiceId(RemoteDownstreamConfig.Agent.SERVICE_ID)
-                                        .setInstanceUUID(INSTANCE_UUID)
-                                        .setTime(System.currentTimeMillis())
-                                        .addAllProperties(OSUtil.buildOSInfo())
-                                ).build());
+                                    .addInstances(
+                                            ServiceInstance.newBuilder()
+                                                    .setServiceId(RemoteDownstreamConfig.Agent.SERVICE_ID)
+                                                    .setInstanceUUID(INSTANCE_UUID)
+                                                    .setTime(System.currentTimeMillis())
+                                                    .addAllProperties(OSUtil.buildOSInfo())
+                                    ).build());
                             for (KeyIntValuePair serviceInstance : instanceMapping.getServiceInstancesList()) {
                                 if (INSTANCE_UUID.equals(serviceInstance.getKey())) {
                                     int serviceInstanceId = serviceInstance.getValue();
@@ -145,10 +140,10 @@ public class ServiceAndEndpointRegisterClient implements BootService, Runnable, 
                             }
                         } else {
                             serviceInstancePingStub.doPing(ServiceInstancePingPkg.newBuilder()
-                                .setServiceInstanceId(RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID)
-                                .setTime(System.currentTimeMillis())
-                                .setServiceInstanceUUID(INSTANCE_UUID)
-                                .build());
+                                    .setServiceInstanceId(RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID)
+                                    .setTime(System.currentTimeMillis())
+                                    .setServiceInstanceUUID(INSTANCE_UUID)
+                                    .build());
 
                             NetworkAddressDictionary.INSTANCE.syncRemoteDictionary(registerBlockingStub);
                             EndpointNameDictionary.INSTANCE.syncRemoteDictionary(registerBlockingStub);

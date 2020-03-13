@@ -18,17 +18,6 @@
 
 package org.apache.skywalking.apm.agent.core.conf;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
 import org.apache.skywalking.apm.agent.core.boot.AgentPackageNotFoundException;
 import org.apache.skywalking.apm.agent.core.boot.AgentPackagePath;
 import org.apache.skywalking.apm.agent.core.logging.api.ILog;
@@ -36,6 +25,9 @@ import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 import org.apache.skywalking.apm.util.ConfigInitializer;
 import org.apache.skywalking.apm.util.PropertyPlaceholderHelper;
 import org.apache.skywalking.apm.util.StringUtil;
+
+import java.io.*;
+import java.util.*;
 
 /**
  * The <code>SnifferConfigInitializer</code> initializes all configs in several way.
@@ -63,6 +55,7 @@ public class SnifferConfigInitializer {
     public static void initialize(String agentOptions) throws ConfigNotFoundException, AgentPackageNotFoundException {
         InputStreamReader configFileStream;
 
+        // laod apm-agent-core config/agent.config
         try {
             configFileStream = loadConfig();
             Properties properties = new Properties();
@@ -78,6 +71,7 @@ public class SnifferConfigInitializer {
         }
 
         try {
+            // System properties 覆盖 配置文件的..
             overrideConfigBySystemProp();
         } catch (Exception e) {
             logger.error(e, "Failed to read the system properties.");
@@ -88,6 +82,7 @@ public class SnifferConfigInitializer {
                 agentOptions = agentOptions.trim();
                 logger.info("Agent options is {}.", agentOptions);
 
+                // 传过来的参数配置
                 overrideConfigByAgentOptions(agentOptions);
             } catch (Exception e) {
                 logger.error(e, "Failed to parse the agent options, val is {}.", agentOptions);

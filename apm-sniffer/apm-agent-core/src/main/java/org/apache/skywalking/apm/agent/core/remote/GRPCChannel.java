@@ -22,6 +22,7 @@ import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.NettyChannelBuilder;
+
 import java.util.LinkedList;
 import java.util.List;
 
@@ -36,7 +37,9 @@ public class GRPCChannel {
     private final Channel channelWithDecorators;
 
     private GRPCChannel(String host, int port, List<ChannelBuilder> channelBuilders,
-        List<ChannelDecorator> decorators) throws Exception {
+                        List<ChannelDecorator> decorators) throws Exception {
+
+        // connect
         ManagedChannelBuilder channelBuilder = NettyChannelBuilder.forAddress(host, port);
 
         for (ChannelBuilder builder : channelBuilders) {

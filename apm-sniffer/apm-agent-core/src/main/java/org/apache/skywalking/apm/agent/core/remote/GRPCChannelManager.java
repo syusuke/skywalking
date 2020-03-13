@@ -18,13 +18,21 @@
 
 package org.apache.skywalking.apm.agent.core.remote;
 
-import io.grpc.*;
-import java.util.*;
-import java.util.concurrent.*;
-import org.apache.skywalking.apm.agent.core.boot.*;
+import io.grpc.Channel;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import org.apache.skywalking.apm.agent.core.boot.BootService;
+import org.apache.skywalking.apm.agent.core.boot.DefaultImplementor;
+import org.apache.skywalking.apm.agent.core.boot.DefaultNamedThreadFactory;
 import org.apache.skywalking.apm.agent.core.conf.Config;
-import org.apache.skywalking.apm.agent.core.logging.api.*;
+import org.apache.skywalking.apm.agent.core.logging.api.ILog;
+import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 import org.apache.skywalking.apm.util.RunnableWithExceptionProtection;
+
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author wusheng, zhang xin
@@ -53,15 +61,17 @@ public class GRPCChannelManager implements BootService, Runnable {
             logger.error("Agent will not uplink any data.");
             return;
         }
+        // 后端地址列表
         grpcServers = Arrays.asList(Config.Collector.BACKEND_SERVICE.split(","));
-        connectCheckFuture = Executors
-            .newSingleThreadScheduledExecutor(new DefaultNamedThreadFactory("GRPCChannelManager"))
-            .scheduleAtFixedRate(new RunnableWithExceptionProtection(this, new RunnableWithExceptionProtection.CallbackWhenException() {
-                @Override
-                public void handle(Throwable t) {
-                    logger.error("unexpected exception.", t);
-                }
-            }), 0, Config.Collector.GRPC_CHANNEL_CHECK_INTERVAL, TimeUnit.SECONDS);
+
+        // 使用定时任务,当一个连接断开后,继续下一个地址
+        connectCheckFuture = Executors.newSingleThreadScheduledExecutor(new DefaultNamedThreadFactory("GRPCChannelManager"))
+                .scheduleAtFixedRate(new RunnableWithExceptionProtection(this, new RunnableWithExceptionProtection.CallbackWhenException() {
+                    @Override
+                    public void handle(Throwable t) {
+                        logger.error("unexpected exception.", t);
+                    }
+                }), 0, Config.Collector.GRPC_CHANNEL_CHECK_INTERVAL, TimeUnit.SECONDS);
     }
 
     @Override
@@ -87,7 +97,9 @@ public class GRPCChannelManager implements BootService, Runnable {
             if (grpcServers.size() > 0) {
                 String server = "";
                 try {
+                    // 随机选一个地址
                     int index = Math.abs(random.nextInt()) % grpcServers.size();
+                    // 选的那个不是当前自己
                     if (index != selectedIdx) {
                         selectedIdx = index;
 
@@ -95,15 +107,18 @@ public class GRPCChannelManager implements BootService, Runnable {
                         String[] ipAndPort = server.split(":");
 
                         if (managedChannel != null) {
+                            // close last
                             managedChannel.shutdownNow();
                         }
 
+                        // new
                         managedChannel = GRPCChannel.newBuilder(ipAndPort[0], Integer.parseInt(ipAndPort[1]))
-                            .addManagedChannelBuilder(new StandardChannelBuilder())
-                            .addManagedChannelBuilder(new TLSChannelBuilder())
-                            .addChannelDecorator(new AuthenticationDecorator())
-                            .build();
+                                .addManagedChannelBuilder(new StandardChannelBuilder())
+                                .addManagedChannelBuilder(new TLSChannelBuilder())
+                                .addChannelDecorator(new AuthenticationDecorator())
+                                .build();
 
+                        // connect
                         notify(GRPCChannelStatus.CONNECTED);
                     }
 
@@ -149,13 +164,13 @@ public class GRPCChannelManager implements BootService, Runnable {
 
     private boolean isNetworkError(Throwable throwable) {
         if (throwable instanceof StatusRuntimeException) {
-            StatusRuntimeException statusRuntimeException = (StatusRuntimeException)throwable;
+            StatusRuntimeException statusRuntimeException = (StatusRuntimeException) throwable;
             return statusEquals(statusRuntimeException.getStatus(),
-                Status.UNAVAILABLE,
-                Status.PERMISSION_DENIED,
-                Status.UNAUTHENTICATED,
-                Status.RESOURCE_EXHAUSTED,
-                Status.UNKNOWN
+                    Status.UNAVAILABLE,
+                    Status.PERMISSION_DENIED,
+                    Status.UNAUTHENTICATED,
+                    Status.RESOURCE_EXHAUSTED,
+                    Status.UNKNOWN
             );
         }
         return false;

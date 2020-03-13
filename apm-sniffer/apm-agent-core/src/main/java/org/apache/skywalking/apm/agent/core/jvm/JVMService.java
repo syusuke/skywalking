@@ -19,11 +19,6 @@
 package org.apache.skywalking.apm.agent.core.jvm;
 
 import io.grpc.Channel;
-import java.util.LinkedList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import org.apache.skywalking.apm.agent.core.boot.BootService;
 import org.apache.skywalking.apm.agent.core.boot.DefaultImplementor;
 import org.apache.skywalking.apm.agent.core.boot.DefaultNamedThreadFactory;
@@ -44,6 +39,12 @@ import org.apache.skywalking.apm.network.language.agent.JVMMetric;
 import org.apache.skywalking.apm.network.language.agent.v2.JVMMetricCollection;
 import org.apache.skywalking.apm.network.language.agent.v2.JVMMetricReportServiceGrpc;
 import org.apache.skywalking.apm.util.RunnableWithExceptionProtection;
+
+import java.util.LinkedList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The <code>JVMService</code> represents a timer, which collectors JVM cpu, memory, memorypool and gc info, and send
@@ -68,21 +69,24 @@ public class JVMService implements BootService, Runnable {
 
     @Override
     public void boot() throws Throwable {
-        collectMetricFuture = Executors
-            .newSingleThreadScheduledExecutor(new DefaultNamedThreadFactory("JVMService-produce"))
-            .scheduleAtFixedRate(new RunnableWithExceptionProtection(this, new RunnableWithExceptionProtection.CallbackWhenException() {
-                @Override public void handle(Throwable t) {
-                    logger.error("JVMService produces metrics failure.", t);
+        // 定时收集数据,放到 queue 中
+        collectMetricFuture = Executors.newSingleThreadScheduledExecutor(new DefaultNamedThreadFactory("JVMService-produce"))
+                .scheduleAtFixedRate(new RunnableWithExceptionProtection(this, new RunnableWithExceptionProtection.CallbackWhenException() {
+                    @Override
+                    public void handle(Throwable t) {
+                        logger.error("JVMService produces metrics failure.", t);
+                    }
+                }), 0, 1, TimeUnit.SECONDS);
+
+        // 消息数据 发送到 TCP
+        sendMetricFuture = Executors.newSingleThreadScheduledExecutor(new DefaultNamedThreadFactory("JVMService-consume"))
+                .scheduleAtFixedRate(new RunnableWithExceptionProtection(sender, new RunnableWithExceptionProtection.CallbackWhenException() {
+                    @Override
+                    public void handle(Throwable t) {
+                        logger.error("JVMService consumes and upload failure.", t);
+                    }
                 }
-            }), 0, 1, TimeUnit.SECONDS);
-        sendMetricFuture = Executors
-            .newSingleThreadScheduledExecutor(new DefaultNamedThreadFactory("JVMService-consume"))
-            .scheduleAtFixedRate(new RunnableWithExceptionProtection(sender, new RunnableWithExceptionProtection.CallbackWhenException() {
-                @Override public void handle(Throwable t) {
-                    logger.error("JVMService consumes and upload failure.", t);
-                }
-            }
-            ), 0, 1, TimeUnit.SECONDS);
+                ), 0, 1, TimeUnit.SECONDS);
     }
 
     @Override
@@ -99,10 +103,12 @@ public class JVMService implements BootService, Runnable {
     @Override
     public void run() {
         if (RemoteDownstreamConfig.Agent.SERVICE_ID != DictionaryUtil.nullValue()
-            && RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID != DictionaryUtil.nullValue()
-        ) {
+                && RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID != DictionaryUtil.nullValue()) {
+
             long currentTimeMillis = System.currentTimeMillis();
             try {
+
+                // 收集JVM信息
                 JVMMetric.Builder jvmBuilder = JVMMetric.newBuilder();
                 jvmBuilder.setTime(currentTimeMillis);
                 jvmBuilder.setCpu(CPUProvider.INSTANCE.getCpuMetric());
@@ -122,16 +128,23 @@ public class JVMService implements BootService, Runnable {
     }
 
     private class Sender implements Runnable, GRPCChannelListener {
+        /**
+         * 两种状态
+         */
         private volatile GRPCChannelStatus status = GRPCChannelStatus.DISCONNECT;
         private volatile JVMMetricReportServiceGrpc.JVMMetricReportServiceBlockingStub stub = null;
 
         @Override
         public void run() {
             if (RemoteDownstreamConfig.Agent.SERVICE_ID != DictionaryUtil.nullValue()
-                && RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID != DictionaryUtil.nullValue()
-            ) {
+                    && RemoteDownstreamConfig.Agent.SERVICE_INSTANCE_ID != DictionaryUtil.nullValue()) {
+
                 if (status == GRPCChannelStatus.CONNECTED) {
+                    // 还是连接状态时
                     try {
+
+                        // 组装数据并发送
+
                         JVMMetricCollection.Builder builder = JVMMetricCollection.newBuilder();
                         LinkedList<JVMMetric> buffer = new LinkedList<JVMMetric>();
                         queue.drainTo(buffer);

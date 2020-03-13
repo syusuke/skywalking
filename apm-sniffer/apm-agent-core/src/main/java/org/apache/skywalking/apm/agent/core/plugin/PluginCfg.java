@@ -31,21 +31,31 @@ import java.util.ArrayList;
 import java.util.List;
 
 public enum PluginCfg {
+    /**
+     * Singleton
+     */
     INSTANCE;
 
     private static final ILog logger = LogManager.getLogger(PluginCfg.class);
 
     private List<PluginDefine> pluginClassList = new ArrayList<PluginDefine>();
 
+    /**
+     * 读取所有的插件到 pluginClassList
+     *
+     * @param input
+     * @throws IOException
+     */
     void load(InputStream input) throws IOException {
         try {
             BufferedReader reader = new BufferedReader(new InputStreamReader(input));
             String pluginDefine = null;
             while ((pluginDefine = reader.readLine()) != null) {
                 try {
-                    if (pluginDefine == null || pluginDefine.trim().length() == 0 || pluginDefine.startsWith("#")) {
+                    if (pluginDefine.trim().length() == 0 || pluginDefine.startsWith("#")) {
                         continue;
                     }
+                    // 插件的定义
                     PluginDefine plugin = PluginDefine.build(pluginDefine);
                     pluginClassList.add(plugin);
                 } catch (IllegalPluginDefineException e) {

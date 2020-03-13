@@ -18,16 +18,11 @@
 
 package org.apache.skywalking.apm.agent.core.boot;
 
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.ServiceLoader;
 import org.apache.skywalking.apm.agent.core.logging.api.ILog;
 import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 import org.apache.skywalking.apm.agent.core.plugin.loader.AgentClassLoader;
+
+import java.util.*;
 
 /**
  * The <code>ServiceManager</code> bases on {@link ServiceLoader},
@@ -36,12 +31,16 @@ import org.apache.skywalking.apm.agent.core.plugin.loader.AgentClassLoader;
  * @author wusheng
  */
 public enum ServiceManager {
+    /**
+     * Singleton
+     */
     INSTANCE;
 
     private static final ILog logger = LogManager.getLogger(ServiceManager.class);
     private Map<Class, BootService> bootedServices = Collections.emptyMap();
 
     public void boot() {
+        // load all service
         bootedServices = loadAllServices();
 
         prepare();
@@ -62,20 +61,26 @@ public enum ServiceManager {
     private Map<Class, BootService> loadAllServices() {
         Map<Class, BootService> bootedServices = new LinkedHashMap<Class, BootService>();
         List<BootService> allServices = new LinkedList<BootService>();
+
+        // put service into allServices
         load(allServices);
+
         Iterator<BootService> serviceIterator = allServices.iterator();
         while (serviceIterator.hasNext()) {
             BootService bootService = serviceIterator.next();
 
             Class<? extends BootService> bootServiceClass = bootService.getClass();
+
             boolean isDefaultImplementor = bootServiceClass.isAnnotationPresent(DefaultImplementor.class);
             if (isDefaultImplementor) {
+                // @DefaultImplementor
                 if (!bootedServices.containsKey(bootServiceClass)) {
                     bootedServices.put(bootServiceClass, bootService);
                 } else {
                     //ignore the default service
                 }
             } else {
+                // @OverrideImplementor
                 OverrideImplementor overrideImplementor = bootServiceClass.getAnnotation(OverrideImplementor.class);
                 if (overrideImplementor == null) {
                     if (!bootedServices.containsKey(bootServiceClass)) {
@@ -91,7 +96,7 @@ public enum ServiceManager {
                             bootedServices.put(targetService, bootService);
                         } else {
                             throw new ServiceConflictException("Service " + bootServiceClass + " overrides conflict, " +
-                                "exist more than one service want to override :" + targetService);
+                                    "exist more than one service want to override :" + targetService);
                         }
                     } else {
                         bootedServices.put(targetService, bootService);
@@ -137,14 +142,15 @@ public enum ServiceManager {
      * Find a {@link BootService} implementation, which is already started.
      *
      * @param serviceClass class name.
-     * @param <T> {@link BootService} implementation class.
+     * @param <T>          {@link BootService} implementation class.
      * @return {@link BootService} instance
      */
     public <T extends BootService> T findService(Class<T> serviceClass) {
-        return (T)bootedServices.get(serviceClass);
+        return (T) bootedServices.get(serviceClass);
     }
 
     void load(List<BootService> allServices) {
+        // Java SPI ALL
         Iterator<BootService> iterator = ServiceLoader.load(BootService.class, AgentClassLoader.getDefault()).iterator();
         while (iterator.hasNext()) {
             allServices.add(iterator.next());
