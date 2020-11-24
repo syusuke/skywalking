@@ -71,7 +71,9 @@ public class PluginFinder {
     }
 
     public List<AbstractClassEnhancePluginDefine> find(TypeDescription typeDescription) {
+        // 匹配类和插件的对应关系,通过存在的类
         List<AbstractClassEnhancePluginDefine> matchedPlugins = new LinkedList<AbstractClassEnhancePluginDefine>();
+        // typeName 就是 类名
         String typeName = typeDescription.getTypeName();
         if (nameMatchDefine.containsKey(typeName)) {
             matchedPlugins.addAll(nameMatchDefine.get(typeName));

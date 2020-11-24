@@ -42,6 +42,7 @@ public class PluginBootstrap {
         AgentClassLoader.initDefaultLoader();
 
         PluginResourcesResolver resolver = new PluginResourcesResolver();
+        // 获取所有的 skywalking-plugin.def 地址
         List<URL> resources = resolver.getResources();
 
         if (resources == null || resources.size() == 0) {
@@ -51,18 +52,21 @@ public class PluginBootstrap {
 
         for (URL pluginUrl : resources) {
             try {
+                // 加载每一个 skywalking-plugin.def 中的配置信息
                 PluginCfg.INSTANCE.load(pluginUrl.openStream());
             } catch (Throwable t) {
                 LOGGER.error(t, "plugin file [{}] init failure.", pluginUrl);
             }
         }
 
+        // 获取加载的类名
         List<PluginDefine> pluginClassList = PluginCfg.INSTANCE.getPluginClassList();
 
         List<AbstractClassEnhancePluginDefine> plugins = new ArrayList<AbstractClassEnhancePluginDefine>();
         for (PluginDefine pluginDefine : pluginClassList) {
             try {
                 LOGGER.debug("loading plugin class {}.", pluginDefine.getDefineClass());
+                // 反射加载类,并创建实例
                 AbstractClassEnhancePluginDefine plugin = (AbstractClassEnhancePluginDefine) Class.forName(pluginDefine.getDefineClass(), true, AgentClassLoader
                     .getDefault()).newInstance();
                 plugins.add(plugin);
@@ -71,6 +75,7 @@ public class PluginBootstrap {
             }
         }
 
+        // 动态插件加载器,Java SPI
         plugins.addAll(DynamicPluginLoader.INSTANCE.load(AgentClassLoader.getDefault()));
 
         return plugins;

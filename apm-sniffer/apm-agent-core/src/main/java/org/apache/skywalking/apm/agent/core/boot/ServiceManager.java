@@ -60,7 +60,9 @@ public enum ServiceManager {
         List<BootService> allServices = new LinkedList<>();
         load(allServices);
         for (final BootService bootService : allServices) {
+            // 所有上报数据的Service
             Class<? extends BootService> bootServiceClass = bootService.getClass();
+            // find default
             boolean isDefaultImplementor = bootServiceClass.isAnnotationPresent(DefaultImplementor.class);
             if (isDefaultImplementor) {
                 if (!bootedServices.containsKey(bootServiceClass)) {
@@ -140,6 +142,7 @@ public enum ServiceManager {
     }
 
     void load(List<BootService> allServices) {
+        // SPI load service
         for (final BootService bootService : ServiceLoader.load(BootService.class, AgentClassLoader.getDefault())) {
             allServices.add(bootService);
         }

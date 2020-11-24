@@ -46,12 +46,14 @@ public enum PluginCfg {
                     if (pluginDefine.trim().length() == 0 || pluginDefine.startsWith("#")) {
                         continue;
                     }
+                    // 每个 skywalking-plugin.def 其中的一行
                     PluginDefine plugin = PluginDefine.build(pluginDefine);
                     pluginClassList.add(plugin);
                 } catch (IllegalPluginDefineException e) {
                     LOGGER.error(e, "Failed to format plugin({}) define.", pluginDefine);
                 }
             }
+            // 有一些插件是手动排除的
             pluginClassList = pluginSelector.select(pluginClassList);
         } finally {
             input.close();
